@@ -53,7 +53,7 @@ export const serializeEnvelope = (type: number, contents: Buffer) => {
 
 export const deserializeEnvelope = (binary: Buffer) => {
   const envelopeReader = Reader.from(binary)
-  const type = envelopeReader.readUInt8()
+  const type = envelopeReader.readUInt8BigNum().toNumber()
   const contents = envelopeReader.readVarOctetString()
 
   return { type, contents }
@@ -108,8 +108,8 @@ export const deserializeIlpPayment = (binary: Buffer): IlpPayment => {
 
   const reader = Reader.from(contents)
 
-  const highBits = reader.readUInt32()
-  const lowBits = reader.readUInt32()
+  const highBits = reader.readUInt32BigNum().toNumber()
+  const lowBits = reader.readUInt32BigNum().toNumber()
   const amount = Long.fromBits(lowBits, highBits, true).toString()
   const account = reader.readVarOctetString().toString('ascii')
   const data = reader.readVarOctetString()
@@ -195,7 +195,7 @@ export const deserializeIlqpLiquidityRequest = (binary: Buffer): IlqpLiquidityRe
 
   const destinationAccount = reader.readVarOctetString().toString('ascii')
 
-  const destinationHoldDuration = reader.readUInt32()
+  const destinationHoldDuration = reader.readUInt32BigNum().toNumber()
 
   // Ignore remaining bytes for extensibility
 
@@ -258,12 +258,12 @@ export const deserializeIlqpLiquidityResponse = (binary: Buffer): IlqpLiquidityR
 
   const reader = Reader.from(contents)
 
-  const numPoints = reader.readVarUInt()
+  const numPoints = reader.readVarUIntBigNum().toNumber()
   const liquidityCurve = reader.read(numPoints * SIZE_OF_POINT)
 
   const appliesToPrefix = reader.readVarOctetString().toString('ascii')
 
-  const sourceHoldDuration = reader.readUInt32()
+  const sourceHoldDuration = reader.readUInt32BigNum().toNumber()
 
   const expiresAt = generalizedTimeToDate(reader.readVarOctetString().toString('ascii'))
 
@@ -315,9 +315,9 @@ export const deserializeIlqpBySourceRequest = (binary: Buffer): IlqpBySourceRequ
 
   const destinationAccount = reader.readVarOctetString().toString('ascii')
 
-  const sourceAmount = twoNumbersToString(reader.readUInt64())
+  const sourceAmount = reader.readUInt64BigNum().toString()
 
-  const destinationHoldDuration = reader.readUInt32()
+  const destinationHoldDuration = reader.readUInt32BigNum().toNumber()
 
   // Ignore remaining bytes for extensibility
 
@@ -358,9 +358,9 @@ export const deserializeIlqpBySourceResponse = (binary: Buffer): IlqpBySourceRes
 
   const reader = Reader.from(contents)
 
-  const destinationAmount = twoNumbersToString(reader.readUInt64())
+  const destinationAmount = reader.readUInt64BigNum().toString()
 
-  const sourceHoldDuration = reader.readUInt32()
+  const sourceHoldDuration = reader.readUInt32BigNum().toNumber()
 
   // Ignore remaining bytes for extensibility
 
@@ -405,9 +405,9 @@ export const deserializeIlqpByDestinationRequest = (binary: Buffer): IlqpByDesti
 
   const destinationAccount = reader.readVarOctetString().toString('ascii')
 
-  const destinationAmount = twoNumbersToString(reader.readUInt64())
+  const destinationAmount = reader.readUInt64BigNum().toString()
 
-  const destinationHoldDuration = reader.readUInt32()
+  const destinationHoldDuration = reader.readUInt32BigNum().toNumber()
 
   // Ignore remaining bytes for extensibility
 
@@ -448,9 +448,9 @@ export const deserializeIlqpByDestinationResponse = (binary: Buffer): IlqpByDest
 
   const reader = Reader.from(contents)
 
-  const sourceAmount = twoNumbersToString(reader.readUInt64())
+  const sourceAmount = reader.readUInt64BigNum().toString()
 
-  const sourceHoldDuration = reader.readUInt32()
+  const sourceHoldDuration = reader.readUInt32BigNum().toNumber()
 
   // Ignore remaining bytes for extensibility
 
@@ -522,7 +522,7 @@ export const deserializeIlpError = (binary: Buffer): IlpError => {
 
   const triggeredBy = reader.readVarOctetString().toString('ascii')
 
-  const forwardedByLength = reader.readVarUInt()
+  const forwardedByLength = reader.readVarUIntBigNum().toNumber()
   const forwardedBy: string[] = new Array(forwardedByLength)
   for (let i = 0; i < forwardedByLength; i++) {
     forwardedBy[i] = reader.readVarOctetString().toString('ascii')
@@ -638,18 +638,18 @@ export const deserializeIlpRejection = (binary: Buffer): IlpRejection => {
 
   if (code === 'F08') {
     const dataReader = Reader.from(data)
-    const highBitsRcv = dataReader.readUInt32()
-    const lowBitsRcv = dataReader.readUInt32()
-    const highBitsMax = dataReader.readUInt32()
-    const lowBitsMax = dataReader.readUInt32()
-    return <IlpF08Rejection> {
+    const highBitsRcv = dataReader.readUInt32BigNum().toNumber()
+    const lowBitsRcv = dataReader.readUInt32BigNum().toNumber()
+    const highBitsMax = dataReader.readUInt32BigNum().toNumber()
+    const lowBitsMax = dataReader.readUInt32BigNum().toNumber()
+    return {
       code,
       triggeredBy,
       message,
       data,
       receivedAmount: Long.fromBits(lowBitsRcv, highBitsRcv, true).toString(),
       maximumAmount: Long.fromBits(lowBitsMax, highBitsMax, true).toString()
-    }
+    } as IlpF08Rejection
   }
 
   return {
@@ -697,8 +697,8 @@ export const deserializeIlpPrepare = (binary: Buffer): IlpPrepare => {
   }
 
   const reader = Reader.from(contents)
-  const highBits = reader.readUInt32()
-  const lowBits = reader.readUInt32()
+  const highBits = reader.readUInt32BigNum().toNumber()
+  const lowBits = reader.readUInt32BigNum().toNumber()
   const amount = Long.fromBits(lowBits, highBits, true).toString()
   const expiresAt = interledgerTimeToDate(reader.read(INTERLEDGER_TIME_LENGTH).toString('ascii'))
   const executionCondition = reader.read(32)
@@ -724,7 +724,6 @@ export const serializeIlpFulfill = (json: IlpFulfill) => {
     json.fulfillment.length === 32, 'fulfillment must be a 32-byte buffer')
   assert(!json.data || Buffer.isBuffer(json.data), 'data must be a buffer')
 
-  
   const writer = new Writer()
   writer.write(json.fulfillment)
   writer.writeVarOctetString(json.data)
